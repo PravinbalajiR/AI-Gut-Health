@@ -24,6 +24,7 @@ class Receipt(Base):
     store_name = Column(String)
     purchase_date = Column(Date)
     receipt_image_url = Column(String)
+    raw_ocr_text = Column(String)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="receipts")
@@ -61,6 +62,14 @@ class Product(Base):
     gut_scores = relationship("GutScore", back_populates="product")
     user_history = relationship("UserProductHistory", back_populates="product")
     regional_variants = relationship("RegionalProduct", back_populates="product")
+
+    @property
+    def ingredients(self):
+        return [pi.ingredient.ingredient_name for pi in sorted(self.product_ingredients, key=lambda x: x.ingredient_order)]
+
+    @property
+    def regions(self):
+        return [rv.region for rv in self.regional_variants]
 
 class Ingredient(Base):
     __tablename__ = "ingredients"
@@ -133,3 +142,24 @@ class RegionalProduct(Base):
     ingredient_notes = Column(Text)
 
     product = relationship("Product", back_populates="regional_variants")
+
+class ShoppingList(Base):
+    __tablename__ = "shopping_lists"
+    list_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.user_id"))
+    name = Column(String, default="My Shopping List")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User")
+    items = relationship("ShoppingListItem", back_populates="shopping_list", cascade="all, delete-orphan")
+
+class ShoppingListItem(Base):
+    __tablename__ = "shopping_list_items"
+    item_id = Column(Integer, primary_key=True, index=True)
+    list_id = Column(Integer, ForeignKey("shopping_lists.list_id"))
+    product_id = Column(Integer, ForeignKey("products.product_id"))
+    added_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    is_purchased = Column(Integer, default=0) # 0=False, 1=True
+
+    shopping_list = relationship("ShoppingList", back_populates="items")
+    product = relationship("Product")

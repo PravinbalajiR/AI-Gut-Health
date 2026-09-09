@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 
 class ProductBase(BaseModel):
     product_name: str
@@ -17,7 +17,8 @@ class ProductBase(BaseModel):
     source: Optional[str] = None
 
 class ProductCreate(ProductBase):
-    pass
+    ingredients_list: Optional[List[str]] = []
+    regions_list: Optional[List[str]] = []
 
 class ProductUpdate(BaseModel):
     product_name: Optional[str] = None
@@ -33,6 +34,8 @@ class ProductUpdate(BaseModel):
 
 class ProductRead(ProductBase):
     product_id: int
+    ingredients: Optional[List[str]] = []
+    regions: Optional[List[str]] = []
 
     class Config:
         from_attributes = True
