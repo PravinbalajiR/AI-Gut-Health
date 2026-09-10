@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Search, Loader2 } from 'lucide-react';
+import { Search, Info, Activity, Leaf } from 'lucide-react';
 
 const NutritionDashboard = () => {
   const [barcode, setBarcode] = useState('');
@@ -19,7 +19,6 @@ const NutritionDashboard = () => {
         { product_id: productId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      // Dispatch event to update the shopping list component
       window.dispatchEvent(new Event('refreshShoppingList'));
       alert("Added to shopping list!");
     } catch (err) {
@@ -30,38 +29,30 @@ const NutritionDashboard = () => {
     }
   };
 
-  // Fetch token from localStorage for now
   const fetchProduct = async () => {
+    if (!barcode) return;
     setLoading(true);
     setError('');
     setProduct(null);
     setGutScore(null);
+    setRecommendations([]);
+
     try {
       const token = localStorage.getItem('token');
       
-      let response;
-      let fetchedProduct;
-      if (/^\d+$/.test(barcode)) {
-        // It's a barcode
-        response = await axios.get(`http://127.0.0.1:8000/api/v1/products/barcode/${barcode}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        fetchedProduct = response.data;
-      } else {
-        // It's a text search
-        response = await axios.get(`http://127.0.0.1:8000/api/v1/products/search?query=${barcode}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (response.data && response.data.length > 0) {
-          fetchedProduct = response.data[0];
-        } else {
-          throw new Error('No products found for this search');
-        }
+      const searchRes = await axios.get(`http://127.0.0.1:8000/api/v1/products/search?query=${barcode}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!searchRes.data || searchRes.data.length === 0) {
+        setError('Product not found in database or Open Food Facts.');
+        setLoading(false);
+        return;
       }
       
+      const fetchedProduct = searchRes.data[0];
       setProduct(fetchedProduct);
 
-      // Fetch the Gut Score
       let scoreVal = null;
       try {
         const scoreRes = await axios.get(`http://127.0.0.1:8000/api/v1/scores/product/${fetchedProduct.product_id}`, {
@@ -73,7 +64,6 @@ const NutritionDashboard = () => {
         console.error("Failed to load gut score", scoreErr);
       }
 
-      // Fetch Recommendations if score is poor (e.g. < 70)
       if (scoreVal !== null && scoreVal < 70) {
         try {
           const recRes = await axios.post(`http://127.0.0.1:8000/api/v1/shopping/recommendations`, 
@@ -102,75 +92,104 @@ const NutritionDashboard = () => {
       <div className="flex gap-4 mb-8">
         <input
           type="text"
-          id="barcode"
           value={barcode}
           onChange={(e) => setBarcode(e.target.value)}
-          placeholder="Enter barcode or product name (e.g. Organic Milk)..."
-          className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+          placeholder="Enter product name or barcode..."
+          className="flex-1 px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <button
           onClick={fetchProduct}
-          disabled={loading || !barcode}
-          className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 flex items-center gap-2 disabled:opacity-50"
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded flex items-center gap-2 font-semibold disabled:opacity-50"
         >
-          {loading ? <Loader2 className="animate-spin h-5 w-5" /> : <Search className="h-5 w-5" />}
-          Scan Product
+          <Search size={20} />
+          {loading ? 'Searching...' : 'Search'}
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-600 p-4 rounded-lg mb-6">
+        <div className="bg-red-50 text-red-700 p-4 rounded mb-6 flex items-center gap-3 border border-red-200">
+          <Info size={20} />
           {error}
         </div>
       )}
 
       {product ? (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden border">
-          <div className="p-6 border-b bg-gray-50">
-            <h2 className="text-2xl font-bold text-gray-800">{product.product_name}</h2>
-            {product.brand && <p className="text-gray-500">{product.brand}</p>}
+        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="p-6 bg-white border-b flex justify-between items-start">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">{product.product_name}</h2>
+              <p className="text-gray-500">{product.brand || 'Unknown Brand'}</p>
+            </div>
+            {product.category && (
+              <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
+                {product.category.split(',')[0]}
+              </span>
+            )}
           </div>
           
           <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Nutrition Facts (per 100g/ml)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
-              <NutritionCard label="Calories" value={product.calories} unit="kcal" color="bg-blue-100 text-blue-800" />
-              <NutritionCard label="Protein" value={product.protein} unit="g" color="bg-green-100 text-green-800" />
-              <NutritionCard label="Fat" value={product.fat} unit="g" color="bg-yellow-100 text-yellow-800" />
-              <NutritionCard label="Carbs" value={product.carbohydrates} unit="g" color="bg-purple-100 text-purple-800" />
-              <NutritionCard label="Fiber" value={product.fiber} unit="g" color="bg-teal-100 text-teal-800" />
-              <NutritionCard label="Sugar" value={product.sugar} unit="g" color="bg-red-100 text-red-800" />
-              <NutritionCard label="Sodium" value={product.sodium} unit="g" color="bg-gray-100 text-gray-800" />
+            <h3 className="text-lg font-bold text-gray-700 mb-4 border-b pb-2">Nutritional Information (per 100g)</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <NutritionCard label="Calories" value={product.calories} unit="kcal" color="bg-orange-100 text-orange-900" />
+              <NutritionCard label="Protein" value={product.protein} unit="g" color="bg-blue-100 text-blue-900" />
+              <NutritionCard label="Carbs" value={product.carbohydrates} unit="g" color="bg-yellow-100 text-yellow-900" />
+              <NutritionCard label="Fat" value={product.fat} unit="g" color="bg-red-100 text-red-900" />
+              <NutritionCard label="Fiber" value={product.fiber} unit="g" color="bg-green-100 text-green-900" />
+              <NutritionCard label="Sugar" value={product.sugar} unit="g" color="bg-purple-100 text-purple-900" />
+              <NutritionCard label="Sodium" value={product.sodium} unit="mg" color="bg-gray-200 text-gray-900" />
             </div>
 
-            {/* Gut Health Score */}
+            {/* Gut Score */}
             {gutScore && (
-              <div className="mt-8 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-green-900">AI Gut Health Score</h3>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-extrabold text-green-600">{gutScore.final_gut_score}</span>
-                    <span className="text-green-800 font-medium">/ 100</span>
+              <div className="mt-8 border-t pt-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <Activity className="text-indigo-600" />
+                    Gut Suitability Prediction
+                  </h3>
+                  {gutScore.is_ml_prediction ? (
+                    <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded font-bold border border-indigo-200">
+                      ML Powered (Conf: {(gutScore.confidence * 100).toFixed(0)}%)
+                    </span>
+                  ) : (
+                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded font-bold border border-gray-200">
+                      Rule-Based Fallback
+                    </span>
+                  )}
+                </div>
+
+                <div className="bg-indigo-50 p-6 rounded-xl flex items-center justify-between border border-indigo-100">
+                  <div>
+                    <p className="text-indigo-900 font-bold mb-1">Final Suitability Score</p>
+                    <p className="text-sm text-indigo-700 max-w-sm">
+                      {gutScore.is_ml_prediction ? 'Predicted by our ML model based on nutritional profile and processing levels.' : 'Calculated based on standard nutrition rules.'}
+                    </p>
+                  </div>
+                  <div className="text-5xl font-black text-indigo-600 bg-white p-4 rounded-full shadow-sm border border-indigo-100">
+                    {gutScore.final_gut_score}
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div className="bg-white p-3 rounded shadow-sm">
-                    <div className="text-xs text-gray-500 uppercase font-semibold">Fiber Bonus</div>
-                    <div className="text-lg font-bold text-gray-800">{gutScore.fiber_score}</div>
+
+                {/* Explanations (Why this score?) */}
+                {gutScore.explanations && gutScore.explanations.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wider">Why this score?</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {gutScore.explanations.map((exp, idx) => (
+                        <div key={idx} className={`p-3 rounded border flex items-start gap-3 ${exp.impact === 'positive' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className={`mt-1 ${exp.impact === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
+                            {exp.impact === 'positive' ? '↗' : '↘'}
+                          </div>
+                          <div>
+                            <p className={`font-bold text-sm ${exp.impact === 'positive' ? 'text-green-800' : 'text-red-800'}`}>{exp.factor}</p>
+                            <p className={`text-xs ${exp.impact === 'positive' ? 'text-green-600' : 'text-red-600'}`}>{exp.reason}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="bg-white p-3 rounded shadow-sm">
-                    <div className="text-xs text-gray-500 uppercase font-semibold">Processing Penalty</div>
-                    <div className="text-lg font-bold text-gray-800">{gutScore.processing_score}</div>
-                  </div>
-                  <div className="bg-white p-3 rounded shadow-sm">
-                    <div className="text-xs text-gray-500 uppercase font-semibold">Sugar Penalty</div>
-                    <div className="text-lg font-bold text-gray-800">{gutScore.sugar_score}</div>
-                  </div>
-                  <div className="bg-white p-3 rounded shadow-sm">
-                    <div className="text-xs text-gray-500 uppercase font-semibold">Additives/Emulsifiers</div>
-                    <div className="text-lg font-bold text-gray-800">{gutScore.additive_score}</div>
-                  </div>
-                </div>
+                )}
               </div>
             )}
 

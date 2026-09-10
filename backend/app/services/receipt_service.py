@@ -4,9 +4,9 @@ from app.schemas.receipt import ReceiptCreate
 from app.services import ocr_service
 from typing import List
 
-def create_receipt_with_items(db: Session, user_id: int, image_bytes: bytes, store_name: str = "Unknown Store") -> Receipt:
+async def create_receipt_with_items(db: Session, user_id: int, image_bytes: bytes, store_name: str = "Unknown Store") -> Receipt:
     # 1. Parse image and match products
-    raw_text, matched_products = ocr_service.process_receipt_image(db, image_bytes)
+    raw_text, matched_products = await ocr_service.process_receipt_image(db, image_bytes)
     
     # 2. Create Receipt
     receipt = Receipt(

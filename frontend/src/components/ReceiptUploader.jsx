@@ -31,7 +31,8 @@ const ReceiptUploader = () => {
       });
       setResult(response.data);
       
-      // Notify DiversityScore to refresh
+      // Notify both ShoppingList and DiversityScore to refresh
+      window.dispatchEvent(new Event('refreshShoppingList'));
       window.dispatchEvent(new Event('refreshDiversity'));
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to process receipt');

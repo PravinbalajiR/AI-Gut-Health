@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     
     # Defaults to sqlite for local dev if Postgres isn't provided
     DATABASE_URL: str = "sqlite:///./gut_health.db"
+    GEMINI_API_KEY: str | None = None
     
     class Config:
         env_file = ".env"

@@ -6,6 +6,7 @@ import DiversityScore from './components/DiversityScore';
 import AIAssistant from './components/AIAssistant';
 import ShoppingList from './components/ShoppingList';
 import AdminPanel from './components/AdminPanel';
+import WeeklyReport from './components/WeeklyReport';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -87,6 +88,10 @@ function App() {
             <div className="lg:col-span-5 space-y-8">
               <AIAssistant />
               <ShoppingList />
+            </div>
+            {/* Full-width Weekly Report */}
+            <div className="lg:col-span-12">
+              <WeeklyReport />
             </div>
           </div>
         )}

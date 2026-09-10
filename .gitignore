@@ -1,9 +1,22 @@
-﻿backend/venv/
+backend/venv/
 backend/__pycache__/
+backend/**/__pycache__/
+backend/**/**/__pycache__/
+**/__pycache__/
+**/*.pyc
 backend/gut_health.db
 frontend/node_modules/
 frontend/dist/
 .env
+backend/.env
 .idea/
 .vscode/
 
+# Large dataset files
+*.zip
+*.pdf
+datasets/
+ml/
+
+# Test / scratch scripts
+backend/test_*.py

@@ -24,10 +24,17 @@ const DiversityScore = () => {
   useEffect(() => {
     fetchScore();
     
-    // Set up a custom event listener so other components can trigger a refresh
+    // Refresh on receipt upload event
     const handleRefresh = () => fetchScore();
     window.addEventListener('refreshDiversity', handleRefresh);
-    return () => window.removeEventListener('refreshDiversity', handleRefresh);
+    
+    // Also poll every 30 seconds so the score is always live
+    const interval = setInterval(fetchScore, 30000);
+    
+    return () => {
+      window.removeEventListener('refreshDiversity', handleRefresh);
+      clearInterval(interval);
+    };
   }, []);
 
   if (loading) return <div className="animate-pulse bg-gray-200 h-32 rounded-xl mb-8 max-w-4xl mx-auto"></div>;
