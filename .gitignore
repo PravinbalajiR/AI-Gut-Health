@@ -16,7 +16,7 @@ backend/.env
 *.zip
 *.pdf
 datasets/
-ml/
+backend/ml/data/
 
 # Test / scratch scripts
 backend/test_*.py
@@ -26,3 +26,5 @@ gut_health.db
 *.jfif
 sarab-1.0.0/
 frontend/postcss.config.js.bak
+
+backend/ml/models/*.pkl

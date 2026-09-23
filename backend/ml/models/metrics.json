@@ -1,0 +1,7 @@
+{
+    "model_version": "gut_suitability_v1.pkl",
+    "dataset_size": 10,
+    "mae": 11.338,
+    "rmse": 14.7028,
+    "r2": 0.8605
+}
