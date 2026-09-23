@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.api.deps import get_current_user
-from app.models.models import User
+from app.models.models import User, Product
 from app.schemas.score import GutScoreRead, FoodDiversityScoreRead
 from app.services import gut_score_service
 

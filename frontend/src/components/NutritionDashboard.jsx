@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { Search, Info, Activity, Leaf } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Info, Activity, Leaf, ShoppingCart, Sparkles, ChevronRight } from 'lucide-react';
 
 const NutritionDashboard = () => {
   const [barcode, setBarcode] = useState('');
@@ -11,7 +12,7 @@ const NutritionDashboard = () => {
   const [error, setError] = useState('');
   const [addingToList, setAddingToList] = useState(false);
 
-  const addToShoppingList = async (productId) => {
+  const addToShoppingList = async (productId, isAlternative = false) => {
     setAddingToList(true);
     try {
       const token = localStorage.getItem('token');
@@ -20,7 +21,7 @@ const NutritionDashboard = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       window.dispatchEvent(new Event('refreshShoppingList'));
-      alert("Added to shopping list!");
+      if(!isAlternative) alert("Added to shopping list!");
     } catch (err) {
       console.error(err);
       alert("Failed to add to shopping list.");
@@ -39,13 +40,12 @@ const NutritionDashboard = () => {
 
     try {
       const token = localStorage.getItem('token');
-      
       const searchRes = await axios.get(`http://127.0.0.1:8000/api/v1/products/search?query=${barcode}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
       if (!searchRes.data || searchRes.data.length === 0) {
-        setError('Product not found in database or Open Food Facts.');
+        setError('Product not found. Our AI could not generate a generic profile for this.');
         setLoading(false);
         return;
       }
@@ -74,10 +74,7 @@ const NutritionDashboard = () => {
         } catch (recErr) {
           console.error("Failed to load recommendations", recErr);
         }
-      } else {
-        setRecommendations([]);
       }
-      
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to fetch product data');
     } finally {
@@ -85,190 +82,200 @@ const NutritionDashboard = () => {
     }
   };
 
-  return (
-    <div className="bg-white rounded-xl shadow-md border overflow-hidden p-6">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">Nutrition Explorer</h1>
-      
-      <div className="flex gap-4 mb-8">
-        <input
-          type="text"
-          value={barcode}
-          onChange={(e) => setBarcode(e.target.value)}
-          placeholder="Enter product name or barcode..."
-          className="flex-1 px-4 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const ScoreBar = ({ label, score, colorClass }) => (
+    <div className="mb-4">
+      <div className="flex justify-between text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">
+        <span>{label}</span>
+        <span>{score}/100</span>
+      </div>
+      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.min(100, Math.max(0, score))}%` }}
+          transition={{ duration: 1, ease: "easeOut" }}
+          className={`h-full rounded-full ${colorClass}`}
         />
-        <button
-          onClick={fetchProduct}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded flex items-center gap-2 font-semibold disabled:opacity-50"
-        >
-          <Search size={20} />
-          {loading ? 'Searching...' : 'Search'}
-        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="h-full flex flex-col bg-white">
+      {/* Search Header */}
+      <div className="p-8 border-b border-gray-100 relative overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-64 h-64 bg-sarab-primary opacity-5 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10">
+          <div className="flex bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden focus-within:ring-2 focus-within:ring-sarab-primary transition-all">
+            <div className="pl-5 flex items-center justify-center text-gray-400">
+              <Search size={22} />
+            </div>
+            <input
+              type="text"
+              value={barcode}
+              onChange={(e) => setBarcode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && fetchProduct()}
+              placeholder="Search for any food, ingredient, or barcode..."
+              className="flex-1 px-4 py-5 focus:outline-none text-lg text-sarab-dark font-medium placeholder-gray-300"
+            />
+            <button
+              onClick={fetchProduct}
+              disabled={loading}
+              className="bg-sarab-dark hover:bg-black text-white px-8 font-bold transition-colors flex items-center justify-center min-w-[120px]"
+            >
+              {loading ? <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Activity size={20}/></motion.div> : 'Search'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {error && (
-        <div className="bg-red-50 text-red-700 p-4 rounded mb-6 flex items-center gap-3 border border-red-200">
+        <div className="m-8 bg-red-50 text-sarab-red p-4 rounded-xl flex items-center gap-3 font-medium text-sm">
           <Info size={20} />
           {error}
         </div>
       )}
 
-      {product ? (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-          <div className="p-6 bg-white border-b flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-800">{product.product_name}</h2>
-              <p className="text-gray-500">{product.brand || 'Unknown Brand'}</p>
-            </div>
-            {product.category && (
-              <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
-                {product.category.split(',')[0]}
-              </span>
-            )}
-          </div>
-          
-          <div className="p-6">
-            <h3 className="text-lg font-bold text-gray-700 mb-4 border-b pb-2">Nutritional Information (per 100g)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <NutritionCard label="Calories" value={product.calories} unit="kcal" color="bg-orange-100 text-orange-900" />
-              <NutritionCard label="Protein" value={product.protein} unit="g" color="bg-blue-100 text-blue-900" />
-              <NutritionCard label="Carbs" value={product.carbohydrates} unit="g" color="bg-yellow-100 text-yellow-900" />
-              <NutritionCard label="Fat" value={product.fat} unit="g" color="bg-red-100 text-red-900" />
-              <NutritionCard label="Fiber" value={product.fiber} unit="g" color="bg-green-100 text-green-900" />
-              <NutritionCard label="Sugar" value={product.sugar} unit="g" color="bg-purple-100 text-purple-900" />
-              <NutritionCard label="Sodium" value={product.sodium} unit="mg" color="bg-gray-200 text-gray-900" />
-            </div>
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto bg-gray-50/50 p-8">
+        <AnimatePresence mode="wait">
+          {!product && !loading && !error && (
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="h-full flex flex-col items-center justify-center text-center opacity-60"
+            >
+              <div className="w-24 h-24 mb-6 rounded-full bg-white shadow-sm flex items-center justify-center text-gray-300 border border-gray-100">
+                <Leaf size={40} />
+              </div>
+              <h3 className="text-xl font-playfair font-bold text-gray-400">Discover What's Inside</h3>
+              <p className="text-sm font-poppins text-gray-400 max-w-sm mt-2">Search for ingredients to see their ML-predicted microbiome impact.</p>
+            </motion.div>
+          )}
 
-            {/* Gut Score */}
-            {gutScore && (
-              <div className="mt-8 border-t pt-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Activity className="text-indigo-600" />
-                    Gut Suitability Prediction
-                  </h3>
-                  {gutScore.is_ml_prediction ? (
-                    <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded font-bold border border-indigo-200">
-                      ML Powered (Conf: {(gutScore.confidence * 100).toFixed(0)}%)
+          {product && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+              className="max-w-2xl mx-auto space-y-8"
+            >
+              {/* Product Header Card */}
+              <div className="bg-white rounded-[30px] p-8 shadow-sarab border border-gray-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-sarab-cream rounded-bl-[100px] -z-10"></div>
+                
+                <div className="flex justify-between items-start mb-8">
+                  <div>
+                    <span className="text-xs font-bold text-sarab-secondary tracking-widest uppercase mb-1 block">
+                      {product.brand || 'Generic Ingredient'}
                     </span>
-                  ) : (
-                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded font-bold border border-gray-200">
-                      Rule-Based Fallback
-                    </span>
+                    <h2 className="text-4xl font-playfair font-bold text-sarab-dark leading-tight">{product.product_name}</h2>
+                  </div>
+                  
+                  {gutScore && (
+                    <div className="text-right flex flex-col items-end">
+                      <div className={`text-5xl font-playfair font-bold ${gutScore.final_gut_score >= 70 ? 'text-sarab-primary' : gutScore.final_gut_score >= 40 ? 'text-sarab-secondary' : 'text-sarab-red'}`}>
+                        {gutScore.final_gut_score}
+                      </div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gut Score</span>
+                    </div>
                   )}
                 </div>
 
-                <div className="bg-indigo-50 p-6 rounded-xl flex items-center justify-between border border-indigo-100">
-                  <div>
-                    <p className="text-indigo-900 font-bold mb-1">Final Suitability Score</p>
-                    <p className="text-sm text-indigo-700 max-w-sm">
-                      {gutScore.is_ml_prediction ? 'Predicted by our ML model based on nutritional profile and processing levels.' : 'Calculated based on standard nutrition rules.'}
-                    </p>
+                {/* Macros Grid */}
+                <div className="grid grid-cols-4 gap-4 mb-8 bg-gray-50 p-4 rounded-2xl">
+                  <div className="text-center">
+                    <span className="block text-xl font-bold text-sarab-dark">{product.calories}<span className="text-xs text-gray-400">kcal</span></span>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Calories</span>
                   </div>
-                  <div className="text-5xl font-black text-indigo-600 bg-white p-4 rounded-full shadow-sm border border-indigo-100">
-                    {gutScore.final_gut_score}
+                  <div className="text-center">
+                    <span className="block text-xl font-bold text-sarab-dark">{product.protein}<span className="text-xs text-gray-400">g</span></span>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Protein</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xl font-bold text-sarab-dark">{product.carbohydrates}<span className="text-xs text-gray-400">g</span></span>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Carbs</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-xl font-bold text-sarab-dark">{product.fiber}<span className="text-xs text-gray-400">g</span></span>
+                    <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Fiber</span>
                   </div>
                 </div>
 
-                {/* Explanations (Why this score?) */}
-                {gutScore.explanations && gutScore.explanations.length > 0 && (
-                  <div className="mt-6">
-                    <h4 className="font-bold text-gray-700 mb-3 text-sm uppercase tracking-wider">Why this score?</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {gutScore.explanations.map((exp, idx) => (
-                        <div key={idx} className={`p-3 rounded border flex items-start gap-3 ${exp.impact === 'positive' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                          <div className={`mt-1 ${exp.impact === 'positive' ? 'text-green-600' : 'text-red-600'}`}>
-                            {exp.impact === 'positive' ? '↗' : '↘'}
-                          </div>
-                          <div>
-                            <p className={`font-bold text-sm ${exp.impact === 'positive' ? 'text-green-800' : 'text-red-800'}`}>{exp.factor}</p>
-                            <p className={`text-xs ${exp.impact === 'positive' ? 'text-green-600' : 'text-red-600'}`}>{exp.reason}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Recommendations */}
-            {recommendations && recommendations.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span className="text-2xl">✨</span> Healthier Alternatives
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {recommendations.map((rec, idx) => (
-                    <div key={idx} className="border border-green-200 bg-green-50 rounded-xl p-4 flex flex-col justify-between">
-                      <div>
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-bold text-green-900">{rec.product.product_name}</h4>
-                          <span className="bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-full">{rec.gut_score}</span>
-                        </div>
-                        {rec.product.brand && <p className="text-sm text-green-700 mb-2">{rec.product.brand}</p>}
-                        <p className="text-xs text-green-800 italic mb-4">"{rec.reason}"</p>
-                      </div>
-                      <button 
-                        onClick={() => addToShoppingList(rec.product.product_id)}
-                        disabled={addingToList}
-                        className="w-full py-2 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 transition-colors"
-                      >
-                        Add to Shopping List
-                      </button>
-                    </div>
-                  ))}
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => addToShoppingList(product.product_id)}
+                    disabled={addingToList}
+                    className="flex-1 bg-sarab-primary text-white py-3 rounded-xl font-bold hover:bg-[#22503a] transition-colors shadow-md flex items-center justify-center gap-2"
+                  >
+                    <ShoppingCart size={18} /> {addingToList ? 'Adding...' : 'Add to List'}
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Ingredients and Regions */}
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {product.ingredients && product.ingredients.length > 0 && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-bold text-gray-800 mb-2">Ingredients</h4>
-                  <p className="text-sm text-gray-600">
-                    {product.ingredients.join(', ')}
-                  </p>
+              {/* Gut Analysis Detail */}
+              {gutScore && (
+                <div className="bg-white rounded-[30px] p-8 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-8 border-b border-gray-100 pb-4">
+                    <Sparkles className="text-sarab-secondary" size={24}/>
+                    <h3 className="text-2xl font-playfair font-bold text-sarab-dark">Microbiome Impact</h3>
+                    {gutScore.is_ml_prediction && (
+                      <span className="ml-auto bg-sarab-cream text-sarab-secondary text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+                        AI Predicted ({(gutScore.confidence * 100).toFixed(0)}%)
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-6">
+                    <ScoreBar label="Fiber Content" score={gutScore.fiber_score} colorClass="bg-sarab-primary" />
+                    <ScoreBar label="Sugar Impact" score={gutScore.sugar_score} colorClass={gutScore.sugar_score > 50 ? 'bg-sarab-primary' : 'bg-sarab-red'} />
+                    <ScoreBar label="Processing Level" score={gutScore.processing_score} colorClass={gutScore.processing_score > 50 ? 'bg-sarab-primary' : 'bg-sarab-secondary'} />
+                  </div>
+                  
+                  {gutScore.explanations && gutScore.explanations.length > 0 && (
+                    <div className="mt-8 bg-sarab-light p-6 rounded-2xl">
+                      <h4 className="font-dancing text-sarab-secondary text-xl mb-3">AI Note</h4>
+                      <ul className="space-y-3">
+                        {gutScore.explanations.map((exp, idx) => (
+                          <li key={idx} className="flex gap-3 text-sm text-gray-600 font-medium">
+                            <span className="text-sarab-primary mt-0.5">•</span> {exp.reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
-              {product.regions && product.regions.length > 0 && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-bold text-gray-800 mb-2">Regional Availability</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {product.regions.map(r => (
-                      <span key={r} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                        {r}
-                      </span>
+
+              {/* Alternatives */}
+              {recommendations && recommendations.length > 0 && (
+                <div className="bg-sarab-dark rounded-[30px] p-8 text-white shadow-sarab-lg relative overflow-hidden">
+                  <div className="absolute -top-10 -right-10 w-40 h-40 bg-sarab-primary opacity-20 rounded-full blur-2xl pointer-events-none"></div>
+                  
+                  <h3 className="text-2xl font-playfair font-bold mb-6">Gut-Friendly Alternatives</h3>
+                  <div className="space-y-4 relative z-10">
+                    {recommendations.map(alt => (
+                      <div key={alt.product_id} className="bg-white/10 backdrop-blur-sm border border-white/10 rounded-2xl p-4 flex justify-between items-center group hover:bg-white/20 transition-all">
+                        <div>
+                          <h4 className="font-bold text-lg">{alt.product_name}</h4>
+                          <div className="flex gap-4 mt-1 text-xs text-gray-300 font-medium">
+                            <span>{alt.calories} kcal</span>
+                            <span>{alt.fiber}g fiber</span>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => addToShoppingList(alt.product_id, true)}
+                          className="w-10 h-10 rounded-full bg-white text-sarab-dark flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0 shadow-md"
+                        >
+                          <ShoppingCart size={16} />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
-            </div>
-
-            <div className="mt-8 pt-6 border-t flex justify-between items-center text-sm text-gray-500">
-              <span>Data Source: <span className="font-semibold">{product.source}</span></span>
-              <span>Processing Level: <span className="font-semibold uppercase">{product.processing_level}</span></span>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white p-10 rounded-xl shadow-sm border border-gray-100 text-center text-gray-500">
-          Enter a product name or barcode to see its nutritional information
-        </div>
-      )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };
-
-const NutritionCard = ({ label, value, unit, color }) => (
-  <div className={`p-4 rounded-lg ${color}`}>
-    <div className="text-sm font-medium mb-1">{label}</div>
-    <div className="text-2xl font-bold">
-      {value !== null && value !== undefined ? `${value}${unit}` : 'N/A'}
-    </div>
-  </div>
-);
 
 export default NutritionDashboard;

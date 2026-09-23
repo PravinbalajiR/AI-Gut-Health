@@ -20,3 +20,9 @@ ml/
 
 # Test / scratch scripts
 backend/test_*.py
+
+gut_health.db
+*.jpg
+*.jfif
+sarab-1.0.0/
+frontend/postcss.config.js.bak

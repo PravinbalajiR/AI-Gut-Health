@@ -10,7 +10,7 @@ from app.services import product_service
 router = APIRouter()
 
 @router.get("/search", response_model=List[ProductRead])
-def search_products(
+async def search_products(
     query: str,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -18,7 +18,7 @@ def search_products(
     """
     Search for products by name.
     """
-    products = product_service.search_products(db, query=query)
+    products = await product_service.search_products(db, query=query)
     return products
 
 @router.get("/barcode/{barcode}", response_model=ProductRead)

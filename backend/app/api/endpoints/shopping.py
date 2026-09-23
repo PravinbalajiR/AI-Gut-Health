@@ -58,7 +58,7 @@ class AddByNameRequest(BaseModel):
     name: str
 
 @router.post("/items/by-name", response_model=ShoppingListItemRead)
-def add_item_by_name(
+async def add_item_by_name(
     req: AddByNameRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -69,12 +69,19 @@ def add_item_by_name(
     product = db.query(Product).filter(
         Product.product_name.ilike(f"%{name}%")
     ).first()
+    
     if not product:
-        # Create a placeholder product
+        from app.services.product_service import generate_generic_product
+        # Generate a real generic product using LLM
+        product = await generate_generic_product(db, name)
+        
+    if not product:
+        # Fallback placeholder product
         product = Product(product_name=name, processing_level=1)
         db.add(product)
         db.commit()
         db.refresh(product)
+        
     # Check if already in list
     existing = db.query(ShoppingListItem).filter(
         ShoppingListItem.list_id == shop_list.list_id,

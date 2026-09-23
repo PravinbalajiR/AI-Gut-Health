@@ -1,68 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import {
-  ShoppingCart, Trash2, CheckCircle2, Circle, Sparkles,
-  Plus, X, Loader2, RefreshCw, PackageCheck
-} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShoppingCart, Trash2, CheckCircle2, Circle, Sparkles, Plus, Loader2, RefreshCw, X } from 'lucide-react';
 
 const API = 'http://127.0.0.1:8000/api/v1';
 const token = () => localStorage.getItem('token');
 const authHeaders = () => ({ Authorization: `Bearer ${token()}` });
 
-/* ── Single item row ────────────────────────────────────────────────────────── */
-function ListItem({ item, onToggle, onRemove }) {
-  const done = !!item.is_purchased;
-  return (
-    <li className={`flex items-center gap-3 py-2.5 px-1 border-b last:border-0 transition-opacity ${done ? 'opacity-50' : ''}`}>
-      <button onClick={() => onToggle(item.item_id)} className="flex-shrink-0 text-gray-400 hover:text-emerald-500 transition-colors">
-        {done
-          ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-          : <Circle className="h-5 w-5" />}
-      </button>
-      <span className={`flex-1 text-sm font-medium text-gray-800 ${done ? 'line-through text-gray-400' : ''}`}>
-        {item.product?.product_name || 'Unknown'}
-      </span>
-      <button onClick={() => onRemove(item.item_id)} className="flex-shrink-0 text-gray-300 hover:text-red-500 transition-colors p-1 rounded">
-        <Trash2 className="h-4 w-4" />
-      </button>
-    </li>
-  );
-}
-
-/* ── Suggestion chip ────────────────────────────────────────────────────────── */
-function SuggestionCard({ item, onAdd, adding }) {
-  return (
-    <div className="flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-lg p-2.5">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800">{item.name}</p>
-        <p className="text-xs text-gray-500 mt-0.5 leading-snug">{item.reason}</p>
-      </div>
-      <button
-        onClick={() => onAdd(item.name)}
-        disabled={adding === item.name}
-        className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-      >
-        {adding === item.name ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
-        Add
-      </button>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════════
-   Main Component
-══════════════════════════════════════════════════════════════════════════════ */
 export default function ShoppingList() {
-  const [list, setList]               = useState(null);
-  const [loading, setLoading]         = useState(true);
+  const [list, setList] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [suggestions, setSuggestions] = useState([]);
-  const [sugLoading, setSugLoading]   = useState(false);
-  const [addInput, setAddInput]       = useState('');
-  const [adding, setAdding]           = useState('');     // name of item being added
+  const [sugLoading, setSugLoading] = useState(false);
+  const [addInput, setAddInput] = useState('');
+  const [adding, setAdding] = useState('');
   const [clearingDone, setClearingDone] = useState(false);
-  const [tab, setTab]                 = useState('list'); // 'list' | 'suggestions'
 
-  /* ── Fetch list ─────────────────────────────────────────────────────────── */
   const fetchList = useCallback(async () => {
     try {
       const res = await axios.get(`${API}/shopping/list`, { headers: authHeaders() });
@@ -74,8 +27,7 @@ export default function ShoppingList() {
     }
   }, []);
 
-  /* ── Fetch AI suggestions ──────────────────────────────────────────────── */
-  const fetchSuggestions = useCallback(async () => {
+  const fetchSuggestions = async () => {
     setSugLoading(true);
     try {
       const res = await axios.get(`${API}/shopping/suggestions`, { headers: authHeaders() });
@@ -85,29 +37,44 @@ export default function ShoppingList() {
     } finally {
       setSugLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     fetchList();
     fetchSuggestions();
+    
     const handleRefresh = () => { fetchList(); fetchSuggestions(); };
     window.addEventListener('refreshShoppingList', handleRefresh);
-    const interval = setInterval(fetchList, 30000);
-    return () => {
-      window.removeEventListener('refreshShoppingList', handleRefresh);
-      clearInterval(interval);
-    };
-  }, [fetchList, fetchSuggestions]);
+    return () => window.removeEventListener('refreshShoppingList', handleRefresh);
+  }, [fetchList]);
 
-  /* ── Add by name ─────────────────────────────────────────────────────────── */
-  const addByName = async (name) => {
+  const toggleItem = async (itemId) => {
+    try {
+      await axios.patch(`${API}/shopping/items/${itemId}/toggle`, {}, { headers: authHeaders() });
+      setList(prev => {
+        if(!prev) return prev;
+        return {
+          ...prev,
+          items: prev.items.map(i => i.item_id === itemId ? { ...i, is_purchased: !i.is_purchased } : i)
+        };
+      });
+    } catch (e) { console.error(e); }
+  };
+
+  const removeItem = async (itemId) => {
+    try {
+      await axios.delete(`${API}/shopping/items/${itemId}`, { headers: authHeaders() });
+      setList(prev => prev ? { ...prev, items: prev.items.filter(i => i.item_id !== itemId) } : prev);
+    } catch (e) { console.error(e); }
+  };
+
+  const addItemByName = async (name) => {
     if (!name.trim()) return;
     setAdding(name);
     try {
-      await axios.post(`${API}/shopping/items/by-name`, { name }, { headers: authHeaders() });
+      await axios.post(`${API}/shopping/items/by-name`, { name: name.trim() }, { headers: authHeaders() });
       await fetchList();
-      if (name === addInput) setAddInput('');
-      // Remove from suggestions if it was suggested
+      if(name === addInput) setAddInput('');
       setSuggestions(prev => prev.filter(s => s.name !== name));
     } catch (e) {
       console.error(e);
@@ -116,173 +83,172 @@ export default function ShoppingList() {
     }
   };
 
-  const handleManualAdd = (e) => {
-    e.preventDefault();
-    if (addInput.trim()) addByName(addInput.trim());
-  };
-
-  /* ── Toggle purchased ───────────────────────────────────────────────────── */
-  const toggleItem = async (itemId) => {
-    try {
-      await axios.patch(`${API}/shopping/items/${itemId}/toggle`, {}, { headers: authHeaders() });
-      setList(prev => ({
-        ...prev,
-        items: prev.items.map(i => i.item_id === itemId ? { ...i, is_purchased: i.is_purchased ? 0 : 1 } : i)
-      }));
-    } catch (e) { console.error(e); }
-  };
-
-  /* ── Remove item ────────────────────────────────────────────────────────── */
-  const removeItem = async (itemId) => {
-    try {
-      await axios.delete(`${API}/shopping/items/${itemId}`, { headers: authHeaders() });
-      setList(prev => ({ ...prev, items: prev.items.filter(i => i.item_id !== itemId) }));
-    } catch (e) { console.error(e); }
-  };
-
-  /* ── Clear purchased ────────────────────────────────────────────────────── */
   const clearPurchased = async () => {
+    if(!list) return;
     setClearingDone(true);
     try {
-      await axios.delete(`${API}/shopping/items/purchased/clear`, { headers: authHeaders() });
-      await fetchList();
-    } catch (e) { console.error(e); }
-    finally { setClearingDone(false); }
+      const doneItems = list.items.filter(i => i.is_purchased);
+      await Promise.all(doneItems.map(i => axios.delete(`${API}/shopping/items/${i.item_id}`, { headers: authHeaders() })));
+      setList(prev => prev ? { ...prev, items: prev.items.filter(i => !i.is_purchased) } : prev);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setClearingDone(false);
+    }
   };
 
-  /* ── Derived state ──────────────────────────────────────────────────────── */
-  const items     = list?.items || [];
-  const pending   = items.filter(i => !i.is_purchased);
-  const done      = items.filter(i => !!i.is_purchased);
-  const hasDone   = done.length > 0;
-
-  if (loading) {
+  if (loading && !list) {
     return (
-      <div className="bg-white rounded-xl shadow-md border overflow-hidden">
-        <div className="p-4 bg-orange-500 text-white flex items-center gap-3">
-          <ShoppingCart className="h-6 w-6" />
-          <h2 className="text-xl font-bold">Smart Shopping List</h2>
-        </div>
-        <div className="p-6 space-y-3">
-          {[1,2,3].map(i => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}
-        </div>
+      <div className="h-full flex items-center justify-center p-8 bg-white border border-gray-100 rounded-3xl">
+        <Loader2 className="animate-spin text-sarab-primary w-8 h-8" />
       </div>
     );
   }
 
-  return (
-    <div className="bg-white rounded-xl shadow-md border overflow-hidden">
+  const items = list?.items || [];
+  const activeItems = items.filter(i => !i.is_purchased).reverse();
+  const doneItems = items.filter(i => i.is_purchased).reverse();
 
-      {/* ── Header ── */}
-      <div className="p-4 bg-orange-500 text-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <ShoppingCart className="h-6 w-6" />
-          <div>
-            <h2 className="text-xl font-bold">Smart Shopping List</h2>
-            <p className="text-orange-100 text-xs">{pending.length} item{pending.length !== 1 ? 's' : ''} to buy</p>
+  return (
+    <div className="flex flex-col h-full overflow-y-auto pb-6 relative z-10">
+      
+      {/* Input */}
+      <div className="mb-8">
+        <form 
+          onSubmit={(e) => { e.preventDefault(); addItemByName(addInput); }}
+          className="relative flex items-center"
+        >
+          <input
+            type="text"
+            value={addInput}
+            onChange={e => setAddInput(e.target.value)}
+            placeholder="Add a new item..."
+            className="w-full pl-5 pr-12 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-sarab-primary focus:bg-white transition-all text-sm font-medium placeholder-gray-400"
+          />
+          <button 
+            type="submit"
+            disabled={!addInput.trim() || !!adding}
+            className="absolute right-2 w-8 h-8 bg-sarab-dark text-white rounded-lg flex items-center justify-center hover:bg-black transition-colors disabled:opacity-50"
+          >
+            {adding === addInput ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />}
+          </button>
+        </form>
+      </div>
+
+      <div className="flex-1 space-y-8">
+        
+        {/* Active Items */}
+        <div>
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center justify-between">
+            To Buy <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{activeItems.length}</span>
+          </h4>
+          
+          <div className="space-y-2">
+            <AnimatePresence>
+              {activeItems.length === 0 && (
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-gray-400 italic">Your list is empty.</motion.p>
+              )}
+              {activeItems.map((item, i) => (
+                <motion.div
+                  key={item.item_id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2, delay: i * 0.05 }}
+                  className="group flex items-center gap-3 p-3 bg-white border border-gray-100 rounded-xl hover:shadow-sm transition-all"
+                >
+                  <button onClick={() => toggleItem(item.item_id)} className="text-gray-300 hover:text-sarab-primary transition-colors focus:outline-none">
+                    <Circle size={22} strokeWidth={2} />
+                  </button>
+                  <span className="flex-1 font-medium text-sarab-dark">{item.product?.product_name || 'Unknown'}</span>
+                  <button onClick={() => removeItem(item.item_id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-sarab-red transition-colors">
+                    <X size={18} />
+                  </button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </div>
         </div>
-        {hasDone && (
-          <button
-            onClick={clearPurchased}
-            disabled={clearingDone}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-bold transition-colors"
-          >
-            <PackageCheck className="h-3.5 w-3.5" />
-            Clear Done
-          </button>
-        )}
-      </div>
 
-      {/* ── Tabs ── */}
-      <div className="flex border-b bg-gray-50">
-        <button
-          onClick={() => setTab('list')}
-          className={`flex-1 py-2.5 text-sm font-bold transition-colors ${tab === 'list' ? 'text-orange-600 border-b-2 border-orange-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          My List {items.length > 0 && <span className="ml-1 text-xs bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">{items.length}</span>}
-        </button>
-        <button
-          onClick={() => setTab('suggestions')}
-          className={`flex-1 py-2.5 text-sm font-bold transition-colors flex items-center justify-center gap-1.5 ${tab === 'suggestions' ? 'text-indigo-600 border-b-2 border-indigo-500 bg-white' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          <Sparkles className="h-3.5 w-3.5" />
-          AI Suggestions
-        </button>
-      </div>
-
-      {/* ── Content ── */}
-      <div className="p-4">
-
-        {tab === 'list' && (
-          <>
-            {/* Manual add input */}
-            <form onSubmit={handleManualAdd} className="flex gap-2 mb-4">
-              <input
-                type="text"
-                value={addInput}
-                onChange={e => setAddInput(e.target.value)}
-                placeholder="Type an item to add…"
-                className="flex-1 px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400 bg-gray-50"
-              />
-              <button
-                type="submit"
-                disabled={!addInput.trim() || adding === addInput.trim()}
-                className="px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-40 transition-colors"
-              >
-                {adding === addInput.trim() ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              </button>
-            </form>
-
-            {/* Items */}
-            {items.length === 0 ? (
-              <div className="text-center py-10 text-gray-400">
-                <ShoppingCart className="h-10 w-10 mx-auto mb-3 text-gray-200" />
-                <p className="text-sm font-medium">Your list is empty</p>
-                <p className="text-xs mt-1">Add items above or check AI Suggestions →</p>
-              </div>
-            ) : (
-              <ul className="divide-y divide-gray-50">
-                {pending.map(item => (
-                  <ListItem key={item.item_id} item={item} onToggle={toggleItem} onRemove={removeItem} />
-                ))}
-                {done.map(item => (
-                  <ListItem key={item.item_id} item={item} onToggle={toggleItem} onRemove={removeItem} />
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-
-        {tab === 'suggestions' && (
-          <>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs text-gray-500">AI-picked gut-health items missing from your diet</p>
-              <button
-                onClick={fetchSuggestions}
-                disabled={sugLoading}
-                className="flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-medium"
-              >
-                <RefreshCw className={`h-3 w-3 ${sugLoading ? 'animate-spin' : ''}`} />
-                Refresh
+        {/* Chef's Recommendations */}
+        {suggestions.length > 0 && (
+          <div className="bg-sarab-cream rounded-2xl p-5 border border-sarab-cream2">
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="font-dancing text-sarab-secondary text-xl">Chef's Recommendations</h4>
+              <button onClick={fetchSuggestions} disabled={sugLoading} className="text-sarab-secondary hover:text-sarab-dark transition-colors disabled:opacity-50">
+                <RefreshCw size={14} className={sugLoading ? 'animate-spin' : ''} />
               </button>
             </div>
-
-            {sugLoading ? (
-              <div className="space-y-2">
-                {[1,2,3,4,5,6].map(i => <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />)}
-              </div>
-            ) : suggestions.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">No suggestions available</p>
-            ) : (
-              <div className="space-y-2">
-                {suggestions.map((s, i) => (
-                  <SuggestionCard key={i} item={s} onAdd={addByName} adding={adding} />
-                ))}
-              </div>
-            )}
-          </>
+            
+            <div className="space-y-3">
+              {suggestions.map((sug, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  className="bg-white p-3 rounded-xl border border-gray-100 flex gap-3 items-start group shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={12} className="text-sarab-secondary" />
+                      <p className="font-bold text-sm text-sarab-dark">{sug.name}</p>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1 leading-snug">{sug.reason}</p>
+                  </div>
+                  <button
+                    onClick={() => addItemByName(sug.name)}
+                    disabled={adding === sug.name}
+                    className="shrink-0 bg-sarab-light text-sarab-primary font-bold text-xs px-3 py-1.5 rounded-lg hover:bg-sarab-primary hover:text-white transition-colors border border-gray-100 group-hover:border-sarab-primary disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {adding === sug.name ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Add
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         )}
+
+        {/* Completed Items */}
+        {doneItems.length > 0 && (
+          <div>
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                Purchased <span className="bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{doneItems.length}</span>
+              </h4>
+              <button 
+                onClick={clearPurchased}
+                disabled={clearingDone}
+                className="text-xs font-semibold text-sarab-red hover:text-red-700 transition-colors disabled:opacity-50"
+              >
+                {clearingDone ? 'Clearing...' : 'Clear All'}
+              </button>
+            </div>
+            
+            <div className="space-y-2 opacity-60">
+              <AnimatePresence>
+                {doneItems.map((item) => (
+                  <motion.div
+                    key={item.item_id}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, height: 0, overflow: 'hidden', padding: 0, margin: 0, border: 0 }}
+                    className="group flex items-center gap-3 p-3 bg-gray-50 rounded-xl"
+                  >
+                    <button onClick={() => toggleItem(item.item_id)} className="text-sarab-primary hover:text-sarab-secondary transition-colors focus:outline-none">
+                      <CheckCircle2 size={22} />
+                    </button>
+                    <span className="flex-1 font-medium text-gray-500 line-through">{item.product?.product_name || 'Unknown'}</span>
+                    <button onClick={() => removeItem(item.item_id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-sarab-red transition-colors">
+                      <X size={18} />
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+        
       </div>
     </div>
   );
