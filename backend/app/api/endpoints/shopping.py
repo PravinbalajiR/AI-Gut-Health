@@ -6,7 +6,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_user
 from app.models.models import User, ShoppingList, ShoppingListItem, Product, Receipt, ReceiptItem
 from app.schemas.shopping import ShoppingListRead, ShoppingListItemCreate, ShoppingListItemRead
-import google.generativeai as genai
+from openai import AsyncOpenAI
 import json, os
 from datetime import datetime, timedelta, timezone
 
@@ -188,9 +188,16 @@ async def get_ai_suggestions(
     )
 
     try:
-        model = genai.GenerativeModel('gemini-3.1-flash-lite')
-        response = await model.generate_content_async(prompt)
-        raw = response.text.replace('```json', '').replace('```', '').strip()
+        api_key = os.environ.get("OPENROUTER_API_KEY")
+        if not api_key:
+            return {"suggestions": [], "error": "OPENROUTER_API_KEY not configured"}
+            
+        client = AsyncOpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1", default_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "Gut Health AI"})
+        response = await client.chat.completions.create(
+            model="qwen/qwen-2.5-7b-instruct",
+            messages=[{"role": "user", "content": prompt}]
+        )
+        raw = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
         suggestions = json.loads(raw)
         return {"suggestions": suggestions[:6]}
     except Exception as e:

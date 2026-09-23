@@ -27,7 +27,8 @@ const AIAssistant = () => {
       
       setMessages(prev => [...prev, { role: 'assistant', content: response.data.answer }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error. Please make sure the GEMINI_API_KEY is configured in the backend environment." }]);
+      const errorMsg = err.response?.data?.detail || "Sorry, I encountered an error communicating with the server.";
+      setMessages(prev => [...prev, { role: 'assistant', content: errorMsg }]);
     } finally {
       setLoading(false);
     }

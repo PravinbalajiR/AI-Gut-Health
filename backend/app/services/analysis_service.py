@@ -3,7 +3,7 @@ import json
 from sqlalchemy.orm import Session
 from app.models.models import User, Receipt, ReceiptItem, Product
 from datetime import datetime, timedelta, timezone
-import google.generativeai as genai
+from openai import AsyncOpenAI
 
 # Realistic average serving sizes (grams) per food category
 SERVING_SIZE_MAP = {
@@ -174,18 +174,30 @@ Rules:
 - For alternatives, only list products categorised as 'bad'.
 """
 
-    model = genai.GenerativeModel('gemini-3.6-flash')
-    response = await model.generate_content_async(prompt)
-    raw = response.text.replace('```json', '').replace('```', '').strip()
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return {"has_data": False, "message": "OPENROUTER_API_KEY is not configured."}
+        
+    client = AsyncOpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1", default_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "Gut Health AI"})
+    try:
+        response = await client.chat.completions.create(
+            model="qwen/qwen-2.5-7b-instruct",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
+        raw = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
+    except Exception as e:
+        return {"has_data": False, "message": f"AI service error: {str(e)}"}
 
     try:
         result = json.loads(raw)
     except Exception:
         return {"has_data": False, "message": f"AI parse error. Raw: {raw[:300]}"}
 
-    # Always inject real computed values — never trust Gemini's math
+    # Always inject real computed values — never trust AI's math
     result["weekly_nutrition"] = totals
     result["product_count"] = len(products)
-    # Source-of-truth: names come from the DB, not Gemini's JSON
+    # Source-of-truth: names come from the DB, not AI's JSON
     result["products"] = [p["name"] for p in products]
     return result

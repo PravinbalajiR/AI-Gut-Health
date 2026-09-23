@@ -23,11 +23,11 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     except Exception as e:
         raise Exception(f"Failed to process image: {str(e)}")
 
-import google.generativeai as genai
+from openai import AsyncOpenAI
 import json
 
 async def parse_receipt_lines(text: str) -> List[str]:
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if api_key:
         try:
             prompt = (
@@ -36,15 +36,18 @@ async def parse_receipt_lines(text: str) -> List[str]:
                 "Output ONLY a valid JSON array of strings, like [\"Steak\", \"Milk\", \"Pears\"]. Do not output markdown blocks or any other text.\n\n"
                 f"RECEIPT TEXT:\n{text}"
             )
-            model = genai.GenerativeModel('gemini-3.1-flash-lite')
-            response = await model.generate_content_async(prompt)
-            clean_text = response.text.replace('```json', '').replace('```', '').strip()
+            client = AsyncOpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+            response = await client.chat.completions.create(
+                model="qwen/qwen-2.5-7b-instruct",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            clean_text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
             items = json.loads(clean_text)
             if isinstance(items, list) and len(items) > 0:
-                print("Gemini successfully extracted receipt items:", items)
+                print("OpenRouter successfully extracted receipt items:", items)
                 return [str(i) for i in items]
         except Exception as e:
-            print("Gemini receipt parsing failed, falling back to regex:", e)
+            print("OpenRouter receipt parsing failed, falling back to regex:", e)
             
     # Fallback basic cleaning
     lines = text.split('\n')
@@ -86,15 +89,15 @@ from fastapi.concurrency import run_in_threadpool
 async def process_receipt_image(db: Session, image_bytes: bytes) -> Tuple[str, List[Product]]:
     text = await run_in_threadpool(extract_text_from_image, image_bytes)
     
-    # 1. Get clean list of food names from Gemini
+    # 1. Get clean list of food names from DeepSeek
     food_names = await parse_receipt_lines(text)
     
     matched_products = []
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     
     if api_key and food_names:
         try:
-            print("Using Gemini to resolve nutritional profiles for:", food_names)
+            print("Using OpenRouter to resolve nutritional profiles for:", food_names)
             prompt = (
                 f"I have a list of food items from a grocery receipt: {json.dumps(food_names)}. "
                 "For each item, provide a generic but realistic nutritional profile per 100g. "
@@ -103,9 +106,12 @@ async def process_receipt_image(db: Session, image_bytes: bytes) -> Tuple[str, L
                 "calories, protein, fat, carbohydrates, fiber, sugar, sodium, processing_level (1 for unprocessed, 3 for processed, 4 for ultra-processed). "
                 "Do not include markdown blocks or any other text."
             )
-            model = genai.GenerativeModel('gemini-3.1-flash-lite')
-            response = await model.generate_content_async(prompt)
-            clean_text = response.text.replace('```json', '').replace('```', '').strip()
+            client = AsyncOpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1")
+            response = await client.chat.completions.create(
+                model="qwen/qwen-2.5-7b-instruct",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            clean_text = response.choices[0].message.content.replace('```json', '').replace('```', '').strip()
             items_data = json.loads(clean_text)
             
             for item in items_data:
@@ -141,9 +147,9 @@ async def process_receipt_image(db: Session, image_bytes: bytes) -> Tuple[str, L
                         
             return text, matched_products
         except Exception as e:
-            print("Gemini resolution failed, falling back to basic matching:", e)
+            print("DeepSeek resolution failed, falling back to basic matching:", e)
 
-    # 2. Fallback to awful fuzzy matching if Gemini fails
+    # 2. Fallback to awful fuzzy matching if AI fails
     for line in food_names:
         if len(line) < 4 or line.lower().startswith('total'):
             continue

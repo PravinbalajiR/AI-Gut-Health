@@ -3,7 +3,7 @@ import json
 from sqlalchemy.orm import Session
 from app.models.models import AIQuery, User, FoodDiversityScore, Receipt
 from app.services.gut_score_service import calculate_user_diversity_score
-import google.generativeai as genai
+from openai import AsyncOpenAI
 from datetime import datetime, timezone, timedelta
 
 def get_structured_context(db: Session, user: User) -> str:
@@ -44,9 +44,9 @@ def get_structured_context(db: Session, user: User) -> str:
     return json.dumps(context_obj, indent=2)
 
 async def query_assistant(db: Session, user: User, question: str) -> str:
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        return "I am unable to answer right now because the GEMINI_API_KEY is not configured in the backend environment. Please ask the developer to configure it!"
+        return "I am unable to answer right now because the OPENROUTER_API_KEY is not configured in the backend environment. Please ask the developer to configure it!"
         
     structured_context = get_structured_context(db, user)
     
@@ -59,9 +59,15 @@ async def query_assistant(db: Session, user: User, question: str) -> str:
     )
     
     try:
-        model = genai.GenerativeModel('gemini-3.6-flash', system_instruction=system_instruction)
-        response = await model.generate_content_async(question)
-        answer = response.text
+        client = AsyncOpenAI(api_key=api_key, base_url="https://openrouter.ai/api/v1", default_headers={"HTTP-Referer": "http://localhost:5173", "X-Title": "Gut Health AI"})
+        response = await client.chat.completions.create(
+            model="qwen/qwen-2.5-7b-instruct",
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": question}
+            ]
+        )
+        answer = response.choices[0].message.content
     except Exception as e:
         answer = f"Sorry, I encountered an error communicating with the AI service: {str(e)}"
         
