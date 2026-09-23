@@ -1,4 +1,4 @@
-fastapi
+﻿fastapi
 uvicorn
 sqlalchemy
 alembic
@@ -10,5 +10,13 @@ python-jose[cryptography]
 passlib[bcrypt]
 python-multipart
 requests
-google-generativeai
 openai
+fuzzywuzzy
+python-Levenshtein
+joblib
+numpy
+pandas
+pdfplumber
+Pillow
+pytesseract
+scikit-learn
