@@ -11,8 +11,8 @@ const AdminPanel = () => {
     try {
       const token = localStorage.getItem('token');
       const [statsRes, productsRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/api/v1/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
-        axios.get('http://127.0.0.1:8000/api/v1/admin/products', { headers: { Authorization: `Bearer ${token}` } })
+        axios.get((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1/admin/stats', { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1/admin/products', { headers: { Authorization: `Bearer ${token}` } })
       ]);
       setStats(statsRes.data);
       setProducts(productsRes.data);
@@ -31,7 +31,7 @@ const AdminPanel = () => {
     if (!window.confirm("Are you sure you want to delete this product from the master taxonomy?")) return;
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(`http://127.0.0.1:8000/api/v1/admin/products/${id}`, {
+      await axios.delete(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/admin/products/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchData(); // Refresh list
@@ -127,3 +127,4 @@ const StatCard = ({ title, value, icon, color }) => (
 );
 
 export default AdminPanel;
+

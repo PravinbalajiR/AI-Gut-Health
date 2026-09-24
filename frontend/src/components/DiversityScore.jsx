@@ -11,7 +11,7 @@ const DiversityScore = () => {
   const fetchScore = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get('http://127.0.0.1:8000/api/v1/scores/diversity/me', {
+      const res = await axios.get((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1/scores/diversity/me', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setScoreData(res.data);
@@ -98,7 +98,7 @@ const DiversityScore = () => {
               if (window.confirm("Are you sure you want to delete all scanned receipts? This will reset your diversity score and weekly report.")) {
                 try {
                   const token = localStorage.getItem("token");
-                  await axios.delete("http://127.0.0.1:8000/api/v1/receipts/all", { headers: { Authorization: `Bearer ${token}` } });
+                  await axios.delete((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + "/api/v1/receipts/all", { headers: { Authorization: `Bearer ${token}` } });
                   window.dispatchEvent(new Event("refreshDiversity"));
                   window.dispatchEvent(new Event("refreshWeeklyReport"));
                 } catch (e) { console.error(e); }
@@ -164,4 +164,5 @@ const DiversityScore = () => {
 };
 
 export default DiversityScore;
+
 

@@ -6,7 +6,7 @@ import {
   Lightbulb, Activity, CheckCircle2, ArrowRight, Trash2
 } from 'lucide-react';
 
-const API = 'http://127.0.0.1:8000/api/v1';
+const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1';
 const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_LABELS = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
 const MEAL_ICONS = { breakfast: '🌅', lunch: '☀️', dinner: '🌙', snack: '🍎' };
@@ -127,7 +127,7 @@ export default function WeeklyReport() {
             if (window.confirm("Are you sure you want to delete all scanned receipts? This will reset your diversity score and weekly report.")) {
               try {
                 const token = localStorage.getItem("token");
-                await axios.delete("http://127.0.0.1:8000/api/v1/receipts/all", { headers: { Authorization: `Bearer ${token}` } });
+                await axios.delete((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + "/api/v1/receipts/all", { headers: { Authorization: `Bearer ${token}` } });
                 window.dispatchEvent(new Event("refreshDiversity"));
                 window.dispatchEvent(new Event("refreshWeeklyReport"));
               } catch (e) { console.error(e); }
@@ -312,4 +312,5 @@ export default function WeeklyReport() {
     </div>
   );
 }
+
 

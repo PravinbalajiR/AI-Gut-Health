@@ -32,7 +32,7 @@ function App() {
       formData.append('username', email);
       formData.append('password', password);
       
-      const response = await axios.post('http://127.0.0.1:8000/api/v1/auth/login', formData);
+      const response = await axios.post((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1/auth/login', formData);
       localStorage.setItem('token', response.data.access_token);
       setToken(response.data.access_token);
       setError('');
@@ -403,3 +403,4 @@ function App() {
 }
 
 export default App;
+

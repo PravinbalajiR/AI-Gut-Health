@@ -3,7 +3,7 @@ import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Trash2, CheckCircle2, Circle, Sparkles, Plus, Loader2, RefreshCw, X } from 'lucide-react';
 
-const API = 'http://127.0.0.1:8000/api/v1';
+const API = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1';
 const token = () => localStorage.getItem('token');
 const authHeaders = () => ({ Authorization: `Bearer ${token()}` });
 
@@ -253,3 +253,4 @@ export default function ShoppingList() {
     </div>
   );
 }
+

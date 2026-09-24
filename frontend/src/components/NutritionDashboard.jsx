@@ -16,7 +16,7 @@ const NutritionDashboard = () => {
     setAddingToList(true);
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://127.0.0.1:8000/api/v1/shopping/items', 
+      await axios.post((import.meta.env.VITE_API_URL || "http://127.0.0.1:8000") + '/api/v1/shopping/items', 
         { product_id: productId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -40,7 +40,7 @@ const NutritionDashboard = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const searchRes = await axios.get(`http://127.0.0.1:8000/api/v1/products/search?query=${barcode}`, {
+      const searchRes = await axios.get(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/products/search?query=${barcode}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -55,7 +55,7 @@ const NutritionDashboard = () => {
 
       let scoreVal = null;
       try {
-        const scoreRes = await axios.get(`http://127.0.0.1:8000/api/v1/scores/product/${fetchedProduct.product_id}`, {
+        const scoreRes = await axios.get(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/scores/product/${fetchedProduct.product_id}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setGutScore(scoreRes.data);
@@ -66,7 +66,7 @@ const NutritionDashboard = () => {
 
       if (scoreVal !== null && scoreVal < 70) {
         try {
-          const recRes = await axios.post(`http://127.0.0.1:8000/api/v1/shopping/recommendations`, 
+          const recRes = await axios.post(`${import.meta.env.VITE_API_URL || "http://127.0.0.1:8000"}/api/v1/shopping/recommendations`, 
             { product_id: fetchedProduct.product_id },
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -279,3 +279,4 @@ const NutritionDashboard = () => {
 };
 
 export default NutritionDashboard;
+
