@@ -20,3 +20,4 @@ pdfplumber
 Pillow
 pytesseract
 scikit-learn
+httpx
