@@ -18,6 +18,19 @@ const MedicalRecords = () => {
     fetchDocs();
   }, []);
 
+    const handleClearAll = async () => {
+    if (!window.confirm("Are you sure you want to delete ALL medical records? This cannot be undone.")) return;
+    try {
+      const token = localStorage.getItem('token');
+      for (const doc of docs) {
+        await axios.delete(`${API}/medical-records/${doc.document_id}`, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      fetchDocs();
+    } catch (err) {
+      console.error("Clear failed", err);
+    }
+  };
+
   const fetchDocs = async () => {
     try {
       const token = localStorage.getItem('token');
