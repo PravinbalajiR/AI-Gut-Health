@@ -38,11 +38,16 @@ def register_user(
     """
     Create new user.
     """
-    user = user_service.get_user_by_email(db, email=user_in.email)
-    if user:
-        raise HTTPException(
-            status_code=400,
-            detail="The user with this username already exists in the system.",
-        )
-    user = user_service.create_user(db, user_in=user_in)
-    return user
+    try:
+        user = user_service.get_user_by_email(db, email=user_in.email)
+            if user:
+                raise HTTPException(
+                    status_code=400,
+                    detail="The user with this username already exists in the system.",
+                )
+            user = user_service.create_user(db, user_in=user_in)
+            return user
+    except Exception as e:
+        import traceback
+        error_msg = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=error_msg)
