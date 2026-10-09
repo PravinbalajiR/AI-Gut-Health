@@ -21,3 +21,4 @@ Pillow
 pytesseract
 scikit-learn
 httpx
+bcrypt==3.2.0
