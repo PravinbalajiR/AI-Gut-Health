@@ -2,6 +2,7 @@ import os
 import json
 from sqlalchemy.orm import Session
 from app.models.models import User, Receipt, ReceiptItem, Product
+from app.models.food_diary_models import FoodDiaryEntry
 from datetime import datetime, timedelta, timezone
 from openai import AsyncOpenAI
 
@@ -104,55 +105,92 @@ def calculate_weekly_totals(products: list[dict]) -> dict:
     }
 
 
-async def generate_weekly_analysis(db: Session, user: User) -> dict:
-    """Use Gemini to generate a full weekly gut health analysis based on REAL receipt data."""
-    products = get_weekly_receipt_products(db, user.user_id)
+def get_weekly_consumed_foods(db: Session, user_id: int) -> list[dict]:
+    """Get all food diary entries from the last 7 days."""
+    seven_days_ago = datetime.now(timezone.utc).date() - timedelta(days=7)
+    entries = db.query(FoodDiaryEntry).filter(
+        FoodDiaryEntry.user_id == user_id,
+        FoodDiaryEntry.consumption_date >= seven_days_ago
+    ).all()
+    
+    foods = []
+    for e in entries:
+        foods.append({
+            "name": f"{e.food_name} ({e.meal_category})",
+            "serving_size_g": 100, # Approximate for raw calculation
+            "calories_per_serving": e.calories or 0,
+            "protein_g": e.protein or 0,
+            "fat_g": e.fat or 0,
+            "carbs_g": e.carbohydrates or 0,
+            "fiber_g": e.fiber or 0,
+            "sugar_g": e.sugar or 0,
+            "sodium_mg": e.sodium or 0,
+            "processing_level": 1 # Assume default
+        })
+    return foods
 
-    if not products:
+async def generate_weekly_analysis(db: Session, user: User, source: str = "receipts") -> dict:
+    """Use Gemini to generate a full weekly gut health analysis based on REAL receipt data and FOOD DIARY logs."""
+    if source == "receipts":
+        all_items = get_weekly_receipt_products(db, user.user_id)
+        source_name = "grocery receipt data"
+    else:
+        all_items = get_weekly_consumed_foods(db, user.user_id)
+        source_name = "food diary logs"
+
+    if not all_items:
         return {
             "has_data": False,
-            "message": "No receipt data found for the past 7 days. Upload a receipt to get your personalised weekly analysis!"
+            "message": f"No {source_name} found for the past 7 days."
         }
 
-    totals = calculate_weekly_totals(products)
+    totals = calculate_weekly_totals(all_items)
     product_detail_str = json.dumps(
-        [{k: v for k, v in p.items() if k != "product_id"} for p in products],
+        [{k: v for k, v in p.items() if k != "product_id"} for p in all_items],
         indent=2
     )
 
-    prompt = f"""You are an expert gut health nutritionist. A user scanned their grocery receipts this week.
+    from app.services.recommendation_service import get_full_patient_context
+    medical_context = get_full_patient_context(db, user.user_id)
+    medical_context_str = json.dumps(medical_context, indent=2)
 
-EXACT PRODUCTS PURCHASED ({len(products)} items, with realistic per-serving nutrition already calculated):
+    prompt = f"""You are an expert gut health nutritionist. A user has provided their {source_name} this week.
+
+CLINICAL & MEDICAL PROFILE:
+{medical_context_str}
+
+EXACT FOODS LOGGED/PURCHASED ({len(all_items)} items, with realistic per-serving nutrition already calculated):
 {product_detail_str}
 
 CALCULATED WEEKLY NUTRITION TOTALS (already correctly computed from real serving sizes):
 {json.dumps(totals, indent=2)}
 
-Your job: generate a personalised gut health report based ONLY on these actual products. 
-DO NOT invent products. Every item in food_categories must come from the product list above.
-Every meal in the meal plan must use ingredients from the product list above.
+Your job: generate a personalised gut health report based ONLY on these actual foods AND their medical context. 
+If they have conditions, allergies, or symptoms, factor that into your analysis.
+DO NOT invent products. Every item in food_categories must come from the list above.
+Every meal in the meal plan must use ingredients from the list above.
 
 Return ONLY valid JSON with no markdown fences, no extra text:
 
 {{
   "has_data": true,
-  "summary": "3-4 sentence personalised summary specifically referencing their actual food choices (use exact product names). Comment on their gut health outlook based on what they actually bought.",
+  "summary": "3-4 sentence personalised summary specifically referencing their actual food choices (use exact names). Comment on their gut health outlook based on what they actually ate/bought.",
   "food_categories": {{
     "good": [
-      {{"name": "<exact product name from list>", "reason": "<specific gut benefit>"}}
+      {{"name": "<exact name from list>", "reason": "<specific gut benefit>"}}
     ],
     "moderate": [
-      {{"name": "<exact product name from list>", "reason": "<why moderate for gut>"}}
+      {{"name": "<exact name from list>", "reason": "<why moderate for gut>"}}
     ],
     "bad": [
-      {{"name": "<exact product name from list>", "reason": "<specific gut harm>"}}
+      {{"name": "<exact name from list>", "reason": "<specific gut harm>"}}
     ]
   }},
   "alternatives": [
-    {{"avoid": "<exact bad product name>", "swap_for": "<specific healthier food>", "benefit": "<gut microbiome benefit>"}}
+    {{"avoid": "<exact bad name>", "swap_for": "<specific healthier food>", "benefit": "<gut microbiome benefit>"}}
   ],
   "meal_plan": {{
-    "monday": {{"breakfast": "<meal using their products>", "lunch": "<meal>", "dinner": "<meal>", "snack": "<snack>"}},
+    "monday": {{"breakfast": "<meal using their foods>", "lunch": "<meal>", "dinner": "<meal>", "snack": "<snack>"}},
     "tuesday": {{"breakfast": "<meal>", "lunch": "<meal>", "dinner": "<meal>", "snack": "<snack>"}},
     "wednesday": {{"breakfast": "<meal>", "lunch": "<meal>", "dinner": "<meal>", "snack": "<snack>"}},
     "thursday": {{"breakfast": "<meal>", "lunch": "<meal>", "dinner": "<meal>", "snack": "<snack>"}},
@@ -161,19 +199,18 @@ Return ONLY valid JSON with no markdown fences, no extra text:
     "sunday": {{"breakfast": "<meal>", "lunch": "<meal>", "dinner": "<meal>", "snack": "<snack>"}}
   }},
   "top_tips": [
-    "<specific tip referencing one of their actual products>",
-    "<specific tip referencing one of their actual products>",
-    "<specific tip referencing one of their actual products>"
+    "<specific tip referencing one of their actual foods>",
+    "<specific tip referencing one of their actual foods>",
+    "<specific tip referencing one of their actual foods>"
   ]
 }}
 
 Rules:
-- EVERY product from the list must appear in exactly one of: good, moderate, or bad.
-- Meal plan meals must reference actual products they bought (e.g. 'Grilled Chicken Breasts with Steamed Broccoli and Carrots').
-- Tips must mention specific products by name, not generic advice.
-- For alternatives, only list products categorised as 'bad'.
+- EVERY food from the list must appear in exactly one of: good, moderate, or bad.
+- Meal plan meals must reference actual foods they ate/bought.
+- Tips must mention specific foods by name, not generic advice.
+- For alternatives, only list foods categorised as 'bad'.
 """
-
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         return {"has_data": False, "message": "OPENROUTER_API_KEY is not configured."}
@@ -197,7 +234,7 @@ Rules:
 
     # Always inject real computed values — never trust AI's math
     result["weekly_nutrition"] = totals
-    result["product_count"] = len(products)
+    result["product_count"] = len(all_items)
     # Source-of-truth: names come from the DB, not AI's JSON
-    result["products"] = [p["name"] for p in products]
+    result["products"] = [p["name"] for p in all_items]
     return result

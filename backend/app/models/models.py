@@ -2,6 +2,9 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Dat
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.core.database import Base
+import app.models.food_diary_models
+# Medical models are defined in medical_models.py and imported below
+# so Alembic can detect them in Base.metadata
 
 class User(Base):
     __tablename__ = "users"
@@ -16,6 +19,18 @@ class User(Base):
     diversity_scores = relationship("FoodDiversityScore", back_populates="user")
     ai_queries = relationship("AIQuery", back_populates="user")
     product_history = relationship("UserProductHistory", back_populates="user")
+    # Medical platform relationships
+    medical_profile = relationship("PatientMedicalProfile", back_populates="user", uselist=False)
+    medical_documents = relationship("MedicalDocument", back_populates="user")
+    conditions = relationship("PatientCondition", back_populates="user")
+    allergies = relationship("PatientAllergy", back_populates="user")
+    medications = relationship("PatientMedication", back_populates="user")
+    lab_results = relationship("LabResult", back_populates="user")
+    symptom_entries = relationship("SymptomEntry", back_populates="user")
+    recommendations = relationship("ClinicalRecommendation", back_populates="user")
+    food_diary_entries = relationship("FoodDiaryEntry", backref="user")
+    daily_nutrition_summaries = relationship("DailyNutritionSummary", backref="user")
+    food_symptom_associations = relationship("FoodSymptomAssociation", backref="user")
 
 class Receipt(Base):
     __tablename__ = "receipts"
@@ -163,3 +178,11 @@ class ShoppingListItem(Base):
 
     shopping_list = relationship("ShoppingList", back_populates="items")
     product = relationship("Product")
+
+# Import medical models so Alembic includes them in Base.metadata
+from app.models.medical_models import (  # noqa: F401
+    PatientMedicalProfile, MedicalDocument, MedicalRecordExtraction,
+    PatientCondition, PatientAllergy, PatientMedication,
+    LabResult, SymptomEntry, ClinicalRecommendation
+)
+

@@ -3,6 +3,7 @@ import json
 from sqlalchemy.orm import Session
 from app.models.models import AIQuery, User, FoodDiversityScore, Receipt
 from app.services.gut_score_service import calculate_user_diversity_score
+from app.services.recommendation_service import get_full_patient_context
 from openai import AsyncOpenAI
 from datetime import datetime, timezone, timedelta
 
@@ -10,14 +11,16 @@ def get_structured_context(db: Session, user: User) -> str:
     """
     Gathers user data to build a highly structured JSON context for the LLM.
     """
+    medical_context = get_full_patient_context(db, user.user_id)
+    
     context_obj = {
         "user_profile": {
             "name": user.name or "Unknown",
-            "health_goal": user.health_goal or "Not specified"
+            "health_goal": user.health_goal or "Not specified",
+            "medical_and_clinical_history": medical_context
         },
         "food_diversity": {},
-        "recent_foods": [],
-        "ml_intelligence_status": "Active (Gut Suitability v1 Model Loaded)"
+        "ml_intelligence_status": "Active (Gut Suitability v1 Model + Medical Context)"
     }
     
     # Get diversity score
@@ -29,18 +32,6 @@ def get_structured_context(db: Session, user: User) -> str:
             "meaning": "30+ unique plants/ingredients per week is optimal"
         }
         
-    # Get recent foods
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    recent_receipts = db.query(Receipt).filter(Receipt.user_id == user.user_id, Receipt.created_at >= seven_days_ago).all()
-    
-    recent_foods = []
-    for r in recent_receipts:
-        for item in r.items:
-            recent_foods.append(item.product.product_name)
-            
-    if recent_foods:
-        context_obj["recent_foods"] = list(set(recent_foods))
-        
     return json.dumps(context_obj, indent=2)
 
 async def query_assistant(db: Session, user: User, question: str) -> str:
@@ -51,11 +42,20 @@ async def query_assistant(db: Session, user: User, question: str) -> str:
     structured_context = get_structured_context(db, user)
     
     system_instruction = (
-        "You are the Gut Health AI Assistant. Your goal is to help the user improve their gut microbiome. "
-        "Base your advice on their actual structured data provided below. "
-        "You must explain concepts clearly but use medical/nutrition safety language (e.g. 'may', 'evidence suggests'). "
-        "Never invent medical facts or claim a food will 'cure' a disease.\n\n"
-        f"--- STRUCTURED USER DATA ---\n{structured_context}\n--- END USER DATA ---"
+        "You are the Gastrointestinal Intelligence Assistant. Your goal is to help the user understand their gut health based on their medical history, symptoms, and nutrition data.\n"
+        "RULES:\n"
+        "1. Never invent or fabricate medical facts, diagnoses, or clinical findings.\n"
+        "2. Never claim to diagnose diseases or prescribe treatment.\n"
+        "3. If symptoms suggest urgency (e.g., severe pain, bleeding), clearly state they must seek urgent medical care.\n"
+        "4. For health-related questions, use this structure when appropriate:\n"
+        "   - **What your records show:** (Summarize relevant documented facts)\n"
+        "   - **Why this may matter:** (Explain relationships without claiming causation)\n"
+        "   - **Personalized guidance:** (General dietary/lifestyle info)\n"
+        "   - **What remains uncertain:** (Missing info)\n"
+        "   - **Recommended next steps:** (Self-monitoring or clinician follow-up)\n"
+        "   - **When to seek care:** (Warning signs)\n"
+        "   - **Sources:** (Links/references to clinical guidelines if applicable)\n\n"
+        f"--- STRUCTURED CLINICAL & NUTRITION DATA ---\n{structured_context}\n--- END DATA ---"
     )
     
     try:

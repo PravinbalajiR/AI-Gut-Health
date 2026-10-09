@@ -8,7 +8,13 @@ import AIAssistant from './components/AIAssistant';
 import ShoppingList from './components/ShoppingList';
 import AdminPanel from './components/AdminPanel';
 import WeeklyReport from './components/WeeklyReport';
-import { Leaf, LogOut, Settings, Menu, X, ArrowRight, Activity, TrendingUp, Sparkles, ShoppingBag } from 'lucide-react';
+import MedicalProfile from './components/MedicalProfile';
+import MedicalRecords from './components/MedicalRecords';
+import SymptomTracker from './components/SymptomTracker';
+import MedicalTimeline from './components/MedicalTimeline';
+import Recommendations from './components/Recommendations';
+import FoodDiary from './components/FoodDiary';
+import { Leaf, LogOut, Settings, Menu, X, ArrowRight, Activity, TrendingUp, Sparkles, ShoppingBag, FileText, Clock, HeartPulse, User, List, Stethoscope } from 'lucide-react';
 
 function App() {
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -135,6 +141,8 @@ function App() {
           
           <div className="hidden lg:flex items-center gap-8 font-medium text-sm">
             <button onClick={() => scrollTo('status')} className="text-gray-600 hover:text-sarab-primary transition-colors">My Gut</button>
+            <button onClick={() => scrollTo('medical')} className="text-gray-600 hover:text-sarab-primary transition-colors">Medical</button>
+            <button onClick={() => scrollTo('food-diary')} className="text-gray-600 hover:text-sarab-primary transition-colors">Food Diary</button>
             <button onClick={() => scrollTo('food')} className="text-gray-600 hover:text-sarab-primary transition-colors">Food & OCR</button>
             <button onClick={() => scrollTo('ai')} className="text-gray-600 hover:text-sarab-primary transition-colors">AI Coach</button>
             <button onClick={() => scrollTo('shopping')} className="text-gray-600 hover:text-sarab-primary transition-colors">Shopping</button>
@@ -172,6 +180,7 @@ function App() {
           >
             <div className="flex flex-col p-4 gap-4 font-medium">
               <button onClick={() => scrollTo('status')} className="text-left py-2 border-b">My Gut</button>
+              <button onClick={() => scrollTo('food-diary')} className="text-left py-2 border-b">Food Diary</button>
               <button onClick={() => scrollTo('food')} className="text-left py-2 border-b">Food & OCR</button>
               <button onClick={() => scrollTo('ai')} className="text-left py-2 border-b">AI Coach</button>
               <button onClick={() => scrollTo('shopping')} className="text-left py-2 border-b">Shopping</button>
@@ -269,6 +278,39 @@ function App() {
                   <div className="w-full max-w-4xl">
                     <DiversityScore />
                   </div>
+                </div>
+              </div>
+                        </section>
+
+            
+            {/* FOOD DIARY */}
+            <section id="food-diary" className="py-20 bg-white relative border-y border-gray-100">
+              <div className="max-w-7xl mx-auto px-6">
+                <FoodDiary />
+              </div>
+            </section>
+
+            {/* MEDICAL HUB */}
+            <section id="medical" className="py-20 bg-sarab-light/30 border-y border-gray-100">
+              <div className="max-w-7xl mx-auto px-6">
+                <div className="text-center mb-16">
+                  <span className="font-dancing text-sarab-primary text-2xl">Clinical Insights</span>
+                  <h2 className="text-4xl font-playfair font-bold text-sarab-dark mt-2">Personalised Gastrointestinal Intelligence</h2>
+                  <p className="text-gray-600 mt-4 max-w-2xl mx-auto">Upload medical reports, track your symptoms, and review AI-driven insights combining your health data with the latest gastroenterological research.</p>
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                  <MedicalProfile />
+                  <SymptomTracker />
+                </div>
+                
+                <div className="mb-8">
+                  <Recommendations />
+                </div>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <MedicalRecords />
+                  <MedicalTimeline />
                 </div>
               </div>
             </section>
@@ -403,4 +445,7 @@ function App() {
 }
 
 export default App;
+
+
+
 
