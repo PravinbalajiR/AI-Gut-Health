@@ -4,10 +4,19 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-
-
 from app.core.config import settings
 from app.api.api import api_router
+from app.core.database import engine
+from app.models.models import Base
+from app.models.medical_models import Base as MedicalBase
+from app.models.food_diary_models import Base as FoodBase
+
+# Auto-create tables for SQLite on startup
+Base.metadata.create_all(bind=engine)
+# MedicalBase and FoodBase should already share the same Base if they imported it correctly,
+# but calling create_all multiple times is safe.
+MedicalBase.metadata.create_all(bind=engine)
+FoodBase.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
