@@ -13,15 +13,29 @@ TESSERACT_PATH = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 if os.path.exists(TESSERACT_PATH):
     pytesseract.pytesseract.tesseract_cmd = TESSERACT_PATH
 
+import requests
+
 def extract_text_from_image(image_bytes: bytes) -> str:
     try:
         image = Image.open(io.BytesIO(image_bytes))
         text = pytesseract.image_to_string(image)
         return text
-    except pytesseract.TesseractNotFoundError:
-        raise Exception("Tesseract OCR is not installed or not in PATH. Please install it from https://github.com/UB-Mannheim/tesseract/wiki and restart the server.")
-    except Exception as e:
-        raise Exception(f"Failed to process image: {str(e)}")
+    except (pytesseract.TesseractNotFoundError, Exception) as e:
+        print("Tesseract failed, falling back to OCR.space API...")
+        response = requests.post(
+            'https://api.ocr.space/parse/image',
+            files={'receipt.jpg': image_bytes},
+            data={'apikey': 'helloworld', 'language': 'eng'}
+        )
+        result = response.json()
+        if result.get('IsErroredOnProcessing'):
+            raise Exception("Cloud OCR failed: " + str(result.get('ErrorMessage')))
+        
+        parsed_text = ""
+        for res in result.get('ParsedResults', []):
+            parsed_text += res.get('ParsedText', '') + chr(10)
+        
+        return parsed_text
 
 from openai import AsyncOpenAI
 import json
