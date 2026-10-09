@@ -99,13 +99,28 @@ async def generate_correlation_insights(db: Session, user_id: int):
     allergies = db.query(PatientAllergy).filter(PatientAllergy.user_id == user_id).all()
     conditions = db.query(PatientCondition).filter(PatientCondition.user_id == user_id).all()
     
-    context = "Patient Medical Context:\n"
+    context = "Patient Medical Context:
+"
+    has_data = False
+    if profile and profile.dietary_restrictions:
+        context += "- Dietary Restrictions/Allergies: " + profile.dietary_restrictions + "
+"
+        has_data = True
+    if profile and profile.gi_history_notes:
+        context += "- Known GI History/Conditions: " + profile.gi_history_notes + "
+"
+        has_data = True
     if allergies:
-        context += "- Allergies: " + ", ".join([a.allergen_name for a in allergies]) + "\n"
+        context += "- Official Allergies: " + ", ".join([a.allergen_name for a in allergies]) + "
+"
+        has_data = True
     if conditions:
-        context += "- Known Conditions: " + ", ".join([c.condition_name for c in conditions]) + "\n"
-    if not allergies and not conditions:
-        context += "- No known allergies or conditions documented.\n"
+        context += "- Official Conditions: " + ", ".join([c.condition_name for c in conditions]) + "
+"
+        has_data = True
+    if not has_data:
+        context += "- No known allergies or conditions documented.
+"
         
     prompt = context + "\nAnalyze the following food-symptom associations observed in this patient's daily diary:\n"
     for c in correlations:
